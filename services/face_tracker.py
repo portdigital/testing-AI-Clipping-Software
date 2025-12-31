@@ -1,45 +1,26 @@
 import cv2
 import numpy as np
 
-# Import mediapipe dengan cara yang kompatibel untuk versi baru dan lama
-try:
-    # Coba cara baru (MediaPipe >= 0.10.x)
-    from mediapipe.python.solutions.face_detection import FaceDetection
-    MP_NEW_API = True
-except (ImportError, AttributeError):
-    try:
-        # Fallback ke cara lama (MediaPipe < 0.10.x)
-        import mediapipe as mp
-        MP_NEW_API = False
-    except ImportError:
-        raise ImportError("MediaPipe tidak terinstall. Silakan install dengan: pip install mediapipe")
-
-
 class FaceTracker:
     """
     Tracks faces in a video and crops the frame to keep the speaker centered.
+    Uses OpenCV's Haar Cascade for better compatibility and performance.
     """
     def __init__(self):
         """
-        Initializes the FaceTracker with a MediaPipe face detection model.
+        Initializes the FaceTracker with OpenCV Haar Cascade face detection.
         """
-        # Use model_selection=0 (short-range) for better performance
-        # Increase min_detection_confidence to reduce false positives
-        if MP_NEW_API:
-            # MediaPipe versi baru (>= 0.10.x)
-            self.face_detection = FaceDetection(
-                model_selection=0, min_detection_confidence=0.5
-            )
-        else:
-            # MediaPipe versi lama (< 0.10.x)
-            import mediapipe as mp
-            mp_face_detection = mp.solutions.face_detection
-            self.face_detection = mp_face_detection.FaceDetection(
-                model_selection=0, min_detection_confidence=0.5
-            )
+        # Use OpenCV's built-in Haar Cascade for face detection
+        # This is more compatible and doesn't require MediaPipe
+        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        self.face_cascade = cv2.CascadeClassifier(cascade_path)
+        
+        if self.face_cascade.empty():
+            raise RuntimeError("Failed to load face cascade classifier")
+        
         # Cache for detected faces to avoid reprocessing
         self.face_cache = {}
-        print("🎯 Initialized intelligent face tracking with MediaPipe (optimized)")
+        print("🎯 Initialized intelligent face tracking with OpenCV (optimized & compatible)")
 
     def detect_faces_in_frame(self, frame, frame_time=None):
         """
@@ -63,31 +44,43 @@ class FaceTracker:
             scale = 0.5
             small_frame = cv2.resize(frame, (int(w*scale), int(h*scale)))
             
-            # Convert to RGB (required by MediaPipe)
-            rgb_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
-            results = self.face_detection.process(rgb_frame)
+            # Convert to grayscale (required by Haar Cascade)
+            gray_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2GRAY)
+            
+            # Detect faces
+            # scaleFactor: how much image size is reduced at each scale
+            # minNeighbors: how many neighbors each candidate rectangle should have
+            detected_faces = self.face_cascade.detectMultiScale(
+                gray_frame,
+                scaleFactor=1.1,
+                minNeighbors=5,
+                minSize=(30, 30)
+            )
 
             faces = []
-            if results.detections:
-                for detection in results.detections:
-                    bbox = detection.location_data.relative_bounding_box
-                    x = int(bbox.xmin * w)  # Scale back to original size
-                    y = int(bbox.ymin * h)
-                    width = int(bbox.width * w)
-                    height = int(bbox.height * h)
+            for (x, y, width, height) in detected_faces:
+                # Scale back to original size
+                x = int(x / scale)
+                y = int(y / scale)
+                width = int(width / scale)
+                height = int(height / scale)
 
-                    center_x = x + width // 2
-                    center_y = y + height // 2
-                    confidence = detection.score[0]
+                center_x = x + width // 2
+                center_y = y + height // 2
+                area = width * height
+                
+                # Estimate confidence based on face size (larger faces = more confident)
+                # Normalize to 0-1 range based on image area
+                confidence = min(1.0, area / (w * h * 0.5))
 
-                    faces.append({
-                        'center_x': center_x,
-                        'center_y': center_y,
-                        'width': width,
-                        'height': height,
-                        'confidence': confidence,
-                        'area': width * height
-                    })
+                faces.append({
+                    'center_x': center_x,
+                    'center_y': center_y,
+                    'width': width,
+                    'height': height,
+                    'confidence': confidence,
+                    'area': area
+                })
 
             result = sorted(faces, key=lambda f: f['confidence'] * f['area'], reverse=True)
             
@@ -216,8 +209,7 @@ class FaceTracker:
         try:
             # Clear cache to free memory
             self.face_cache = {}
-            # Close the face detection model
-            self.face_detection.close()
+            # OpenCV doesn't need explicit closing
             print("🎯 Face tracking resources released")
         except Exception as e:
             print(f"⚠️ Error closing face tracker: {e}")
