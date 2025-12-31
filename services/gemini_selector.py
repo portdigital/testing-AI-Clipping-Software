@@ -15,7 +15,23 @@ class GeminiSelector:
         """
         self.api_key = api_key
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        # Try different Gemini models in order of preference
+        # gemini-2.5-flash is the latest and fastest, with fallbacks for compatibility
+        model_names = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro', 'gemini-1.0-pro']
+        self.model = None
+        
+        for model_name in model_names:
+            try:
+                self.model = genai.GenerativeModel(model_name)
+                # Test if model works by checking if it's accessible
+                print(f"✅ Using Gemini model: {model_name}")
+                break
+            except Exception as e:
+                print(f"⚠️  Model {model_name} not available: {e}")
+                continue
+        
+        if self.model is None:
+            raise ValueError("No compatible Gemini model found. Please check your API key and model availability.")
 
     def select_clips(self, segments, video_duration, n, min_dur, max_dur):
         """
