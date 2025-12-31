@@ -1,6 +1,18 @@
 import cv2
-import mediapipe as mp
 import numpy as np
+
+# Import mediapipe dengan cara yang kompatibel untuk versi baru dan lama
+try:
+    # Coba cara baru (MediaPipe >= 0.10.x)
+    from mediapipe.python.solutions.face_detection import FaceDetection
+    MP_NEW_API = True
+except (ImportError, AttributeError):
+    try:
+        # Fallback ke cara lama (MediaPipe < 0.10.x)
+        import mediapipe as mp
+        MP_NEW_API = False
+    except ImportError:
+        raise ImportError("MediaPipe tidak terinstall. Silakan install dengan: pip install mediapipe")
 
 
 class FaceTracker:
@@ -11,12 +23,20 @@ class FaceTracker:
         """
         Initializes the FaceTracker with a MediaPipe face detection model.
         """
-        self.mp_face_detection = mp.solutions.face_detection
         # Use model_selection=0 (short-range) for better performance
         # Increase min_detection_confidence to reduce false positives
-        self.face_detection = self.mp_face_detection.FaceDetection(
-            model_selection=0, min_detection_confidence=0.5
-        )
+        if MP_NEW_API:
+            # MediaPipe versi baru (>= 0.10.x)
+            self.face_detection = FaceDetection(
+                model_selection=0, min_detection_confidence=0.5
+            )
+        else:
+            # MediaPipe versi lama (< 0.10.x)
+            import mediapipe as mp
+            mp_face_detection = mp.solutions.face_detection
+            self.face_detection = mp_face_detection.FaceDetection(
+                model_selection=0, min_detection_confidence=0.5
+            )
         # Cache for detected faces to avoid reprocessing
         self.face_cache = {}
         print("🎯 Initialized intelligent face tracking with MediaPipe (optimized)")
