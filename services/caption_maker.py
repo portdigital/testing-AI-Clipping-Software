@@ -112,13 +112,17 @@ class CaptionMaker:
         text_width = temp_bbox[2] - temp_bbox[0]
         text_height = temp_bbox[3] - temp_bbox[1]
 
+        # Center horizontally
         x = (width - text_width) // 2
-
-        safe_bottom_margin = int(height * 0.15)
+        
+        # Position at bottom with good margin for 9:16 videos
+        # Margin slightly higher for better visibility on phones
+        safe_bottom_margin = int(height * 0.12)
         y = height - text_height - safe_bottom_margin
 
-        if y < height * 0.7:
-            y = int(height * 0.7)
+        # Make sure text doesn't go too high
+        if y < height * 0.75:
+            y = int(height * 0.75)
 
         if is_highlighted:
             text_color = (255, 255, 0, 255)
@@ -177,7 +181,9 @@ class CaptionMaker:
             return clip
 
         video_width, video_height = clip.size
-        base_font_size = max(48, int(min(video_width, video_height) * 0.06))
+        # Optimized font size for 9:16 vertical videos (YouTube Shorts)
+        # Smaller and more readable
+        base_font_size = max(36, int(video_height * 0.04))
 
         for word_data in clip_words:
             word_text = word_data['word']

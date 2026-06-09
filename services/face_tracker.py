@@ -122,20 +122,22 @@ class FaceTracker:
 
     def track_and_crop(self, clip):
         """
-        Tracks faces in a video clip and crops it to keep the speaker centered.
+        Tracks faces in a video clip and crops it to 9:16 (YouTube Shorts format).
 
         Args:
             clip (moviepy.editor.VideoFileClip): The video clip to process.
 
         Returns:
-            moviepy.editor.VideoFileClip: The cropped video clip.
+            moviepy.editor.VideoFileClip: The cropped video clip in 9:16 format.
         """
         width, height = clip.size
         target_width = int(height * 9 / 16)
         if target_width % 2 != 0:
             target_width -= 1
+        
+        # Always crop to 9:16 for YouTube Shorts
         if width <= target_width:
-            print("    ⏩ Skipping face tracking - video already in target aspect ratio")
+            print("    ⏩ Video already in 9:16 format")
             return clip
 
         print("    🎯 Analyzing frames for optimal face tracking (optimized)...")
@@ -199,9 +201,10 @@ class FaceTracker:
         # Clear cache to free memory
         self.face_cache = {}
         
-        # Crop video (MoviePy doesn't support resize_algorithm parameter)
+        # Crop video to 9:16 (MoviePy doesn't support resize_algorithm parameter)
         cropped_clip = clip.crop(x1=left, width=target_width)
-        print(f"    ✅ Video cropping complete: {target_width}x{height}")
+        aspect_ratio = target_width / height
+        print(f"    ✅ Video cropped to 9:16: {target_width}x{height} (Aspect: {aspect_ratio:.2f})")
         return cropped_clip
 
     def close(self):
